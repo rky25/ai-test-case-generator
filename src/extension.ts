@@ -40,6 +40,10 @@ export function activate(ctx: vscode.ExtensionContext) {
     vscode.commands.registerCommand("testgen.runTests", () =>
       handleRunTests()
     ),
+    vscode.commands.registerCommand(
+      "testgen.runTestAndReport",
+      (uri?: vscode.Uri) => handleRunTestAndReport(ctx, uri)
+    ),
     vscode.commands.registerCommand("testgen.setApiKey", () =>
       setApiKey(ctx, "primary")
     ),
@@ -63,10 +67,15 @@ export function activate(ctx: vscode.ExtensionContext) {
 
   // ── Python CodeLens ────────────────────────────────────────
   const pythonCodeLens = new TestGenCodeLensProvider();
+  const testReportCodeLens = new TestReportCodeLensProvider();
   ctx.subscriptions.push(
     vscode.languages.registerCodeLensProvider(
       { language: "python", scheme: "file" },
       pythonCodeLens
+    ),
+    vscode.languages.registerCodeLensProvider(
+      { language: "python", scheme: "file" },
+      testReportCodeLens
     )
   );
 
@@ -304,20 +313,25 @@ async function handleGenerate(
           msg += ` | pytest: ${totalPassed} passed, ${totalFailed} failed`;
         }
 
-        const openAction = "Open Tests";
+        const openAction = "Open Test File";
+        const runAction = "Run & View Report";
         const choice = await vscode.window.showInformationMessage(
           msg,
-          openAction
+          openAction,
+          runAction
         );
 
-        // Open the first generated file
-        if (choice === openAction && parsed.results?.length) {
+        if (parsed.results?.length) {
           const firstOk = parsed.results.find(
             (r: any) => r.status === "ok" && r.file
           );
           if (firstOk) {
-            const doc = await vscode.workspace.openTextDocument(firstOk.file);
-            await vscode.window.showTextDocument(doc, { preview: false });
+            if (choice === openAction) {
+              const doc = await vscode.workspace.openTextDocument(firstOk.file);
+              await vscode.window.showTextDocument(doc, { preview: false });
+            } else if (choice === runAction) {
+              await handleRunTestAndReport(ctx, vscode.Uri.file(firstOk.file));
+            }
           }
         }
 
@@ -891,3 +905,143 @@ async function handleInitConfig(): Promise<void> {
     "✅ Created .testgenrc.json — customize your project settings!"
   );
 }
+
+// ── Test Execution & Quality Report Handler ──────────────────────
+
+async function handleRunTestAndReport(
+  ctx: vscode.ExtensionContext,
+  targetUri?: vscode.Uri
+): Promise<void> {
+  let targetPath: string | undefined;
+
+  if (targetUri && targetUri.fsPath) {
+    targetPath = targetUri.fsPath;
+  } else {
+    const editor = vscode.window.activeTextEditor;
+    if (editor) {
+      targetPath = editor.document.fileName;
+    }
+  }
+
+  if (!targetPath) {
+    vscode.window.showWarningMessage("Open or select a test file first.");
+    return;
+  }
+
+  // If a source file is open instead of a test file, look for its generated test
+  const baseName = path.basename(targetPath).toLowerCase();
+  if (!baseName.startsWith("test_") && !baseName.endsWith("_test.py")) {
+    const dir = path.dirname(targetPath);
+    const candidateDir = path.join(dir, "generated_tests");
+    if (fs.existsSync(candidateDir)) {
+      const stem = path.basename(targetPath, path.extname(targetPath));
+      const candidates = fs.readdirSync(candidateDir).filter(
+        (f) => f.startsWith(`test_${stem}`) && f.endsWith(".py")
+      );
+      if (candidates.length > 0) {
+        targetPath = path.join(candidateDir, candidates[0]);
+      }
+    }
+  }
+
+  if (!targetPath || !fs.existsSync(targetPath)) {
+    vscode.window.showWarningMessage(
+      `No test file found. Generate tests first or open a test_*.py file.`
+    );
+    return;
+  }
+
+  const pythonPath = getPythonPath();
+  const reporterScript = path.join(ctx.extensionPath, "engine", "reporter.py");
+
+  await vscode.window.withProgress(
+    {
+      location: vscode.ProgressLocation.Notification,
+      title: "🧪 Running Tests & Analyzing Results",
+      cancellable: false,
+    },
+    async (progress) => {
+      progress.report({ message: "Executing pytest and calculating pass/fail metrics…" });
+
+      const args = [
+        reporterScript,
+        "--file", targetPath!,
+        "--python", pythonPath,
+        "--json",
+        "--html",
+      ];
+
+      try {
+        const output = await runPythonEngine(pythonPath, args);
+        const report = JSON.parse(output);
+
+        if (report.error) {
+          vscode.window.showErrorMessage(`TestGen Reporter: ${report.error}`);
+          return;
+        }
+
+        const summary = report.summary || {};
+        const htmlPath = report.html_report;
+
+        // Open interactive Webview panel
+        if (htmlPath && fs.existsSync(htmlPath)) {
+          const htmlContent = fs.readFileSync(htmlPath, "utf-8");
+          const fileName = report.test_file_name || path.basename(targetPath!);
+          const panel = vscode.window.createWebviewPanel(
+            "testgenQualityReport",
+            `🧪 Report: ${fileName}`,
+            vscode.ViewColumn.Beside,
+            {
+              enableScripts: true,
+              retainContextWhenHidden: true,
+            }
+          );
+          panel.webview.html = htmlContent;
+        }
+
+        const statusMsg = `🧪 Results: ${summary.passed} passed, ${summary.failed + summary.errors} failed (${summary.pass_rate}% quality score)`;
+        const browserAction = "Open in Browser";
+        vscode.window.showInformationMessage(statusMsg, browserAction).then((choice) => {
+          if (choice === browserAction && htmlPath) {
+            vscode.env.openExternal(vscode.Uri.file(htmlPath));
+          }
+        });
+      } catch (err: any) {
+        vscode.window.showErrorMessage(
+          `Failed to generate test report: ${err.message || err}`
+        );
+      }
+    }
+  );
+}
+
+// ── CodeLens Provider for Generated Test Files ───────────────────
+
+class TestReportCodeLensProvider implements vscode.CodeLensProvider {
+  private _onDidChangeCodeLenses = new vscode.EventEmitter<void>();
+  public readonly onDidChangeCodeLenses = this._onDidChangeCodeLenses.event;
+
+  provideCodeLenses(document: vscode.TextDocument): vscode.CodeLens[] {
+    const lenses: vscode.CodeLens[] = [];
+    const baseName = path.basename(document.fileName).toLowerCase();
+
+    // Only apply to Python test files
+    if (!baseName.startsWith("test_") && !baseName.endsWith("_test.py")) {
+      return lenses;
+    }
+
+    // Place a prominent CodeLens at line 0
+    const topRange = new vscode.Range(0, 0, 0, 0);
+    lenses.push(
+      new vscode.CodeLens(topRange, {
+        title: "▶ Run Tests & View Quality Report",
+        command: "testgen.runTestAndReport",
+        arguments: [document.uri],
+        tooltip: "Execute pytest and view interactive pass/fail & mismatch report",
+      })
+    );
+
+    return lenses;
+  }
+}
+

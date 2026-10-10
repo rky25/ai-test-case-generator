@@ -2,7 +2,7 @@
   "name": "ai-testgen",
   "displayName": "AI Test Case Generator",
   "description": "Enterprise-grade AI test case generator for Python and Salesforce Apex with cross-file dependency awareness, governor limits, and bulk test intelligence",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "publisher": "rajeshkumar",
   "license": "MIT",
   "repository": {
@@ -53,6 +53,10 @@
         "title": "TestGen: Run Generated Tests"
       },
       {
+        "command": "testgen.runTestAndReport",
+        "title": "TestGen: Run Tests & View Quality Report"
+      },
+      {
         "command": "testgen.setApiKey",
         "title": "TestGen: Set Primary API Key"
       },
@@ -81,14 +85,19 @@
           "group": "testgen@1"
         },
         {
+          "command": "testgen.runTestAndReport",
+          "when": "resourceFilename =~ /test_.*\\.py/",
+          "group": "testgen@2"
+        },
+        {
           "command": "testgen.generateApexTests",
           "when": "resourceExtname == .cls || resourceLangId == apex",
-          "group": "testgen@1"
+          "group": "testgen@3"
         },
         {
           "command": "testgen.generateApexForMethod",
           "when": "resourceExtname == .cls || resourceLangId == apex",
-          "group": "testgen@2"
+          "group": "testgen@4"
         }
       ],
       "commandPalette": [
@@ -105,6 +114,10 @@
         },
         {
           "command": "testgen.runTests",
+          "when": "resourceLangId == python"
+        },
+        {
+          "command": "testgen.runTestAndReport",
           "when": "resourceLangId == python"
         },
         {
