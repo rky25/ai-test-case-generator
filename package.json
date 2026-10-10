@@ -1,0 +1,176 @@
+{
+  "name": "ai-testgen",
+  "displayName": "AI Test Case Generator",
+  "description": "Enterprise-grade AI test case generator for Python and Salesforce Apex with cross-file dependency awareness, governor limits, and bulk test intelligence",
+  "version": "0.5.0",
+  "publisher": "rajeshkumar",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/rky25/ai-test-case-generator"
+  },
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Testing",
+    "Programming Languages"
+  ],
+  "keywords": [
+    "python",
+    "pytest",
+    "salesforce",
+    "apex",
+    "soql",
+    "test",
+    "ai",
+    "test-generation",
+    "enterprise"
+  ],
+  "activationEvents": [
+    "onLanguage:python",
+    "onLanguage:apex",
+    "workspaceContains:**/*.cls"
+  ],
+  "main": "./out/extension.js",
+  "icon": "images/icon.png",
+  "contributes": {
+    "commands": [
+      {
+        "command": "testgen.generateForFunction",
+        "title": "TestGen: Generate Tests for This Function"
+      },
+      {
+        "command": "testgen.generateForFile",
+        "title": "TestGen: Generate Tests for Entire File"
+      },
+      {
+        "command": "testgen.generateForProject",
+        "title": "TestGen: Generate Tests for Entire Project"
+      },
+      {
+        "command": "testgen.runTests",
+        "title": "TestGen: Run Generated Tests"
+      },
+      {
+        "command": "testgen.setApiKey",
+        "title": "TestGen: Set Primary API Key"
+      },
+      {
+        "command": "testgen.setFallbackKey",
+        "title": "TestGen: Set Fallback API Key"
+      },
+      {
+        "command": "testgen.initConfig",
+        "title": "TestGen: Initialize Project Config (.testgenrc.json)"
+      },
+      {
+        "command": "testgen.generateApexTests",
+        "title": "TestGen: Generate Apex Tests for File"
+      },
+      {
+        "command": "testgen.generateApexForMethod",
+        "title": "TestGen: Generate Apex Tests for Method"
+      }
+    ],
+    "menus": {
+      "editor/context": [
+        {
+          "command": "testgen.generateForFile",
+          "when": "resourceLangId == python",
+          "group": "testgen@1"
+        },
+        {
+          "command": "testgen.generateApexTests",
+          "when": "resourceExtname == .cls || resourceLangId == apex",
+          "group": "testgen@1"
+        },
+        {
+          "command": "testgen.generateApexForMethod",
+          "when": "resourceExtname == .cls || resourceLangId == apex",
+          "group": "testgen@2"
+        }
+      ],
+      "commandPalette": [
+        {
+          "command": "testgen.generateForFunction",
+          "when": "resourceLangId == python"
+        },
+        {
+          "command": "testgen.generateForFile",
+          "when": "resourceLangId == python"
+        },
+        {
+          "command": "testgen.generateForProject"
+        },
+        {
+          "command": "testgen.runTests",
+          "when": "resourceLangId == python"
+        },
+        {
+          "command": "testgen.setApiKey"
+        },
+        {
+          "command": "testgen.setFallbackKey"
+        },
+        {
+          "command": "testgen.initConfig"
+        },
+        {
+          "command": "testgen.generateApexTests",
+          "when": "resourceExtname == .cls || resourceLangId == apex"
+        },
+        {
+          "command": "testgen.generateApexForMethod",
+          "when": "resourceExtname == .cls || resourceLangId == apex"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "AI Test Case Generator",
+      "properties": {
+        "testgen.pythonPath": {
+          "type": "string",
+          "default": "python",
+          "description": "Path to the Python interpreter (uses workspace Python by default)"
+        },
+        "testgen.apiBaseUrl": {
+          "type": "string",
+          "default": "https://generativelanguage.googleapis.com/v1beta/openai",
+          "description": "Base URL for the OpenAI-compatible API (default: Gemini)"
+        },
+        "testgen.model": {
+          "type": "string",
+          "default": "gemini-2.5-flash",
+          "description": "AI model to use for test generation"
+        },
+        "testgen.outputFolder": {
+          "type": "string",
+          "default": "generated_tests",
+          "description": "Folder name where generated test files are saved (relative to source file)"
+        },
+        "testgen.validateTests": {
+          "type": "boolean",
+          "default": true,
+          "description": "Validate generated test code (syntax & structure check) before saving"
+        },
+        "testgen.autoRunTests": {
+          "type": "boolean",
+          "default": false,
+          "description": "Automatically run pytest after test generation"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "lint": "eslint src --ext ts"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.85.0",
+    "@types/node": "^20.0.0",
+    "typescript": "^5.3.0"
+  }
+}

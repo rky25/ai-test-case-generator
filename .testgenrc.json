@@ -1,0 +1,32 @@
+{
+  "include": ["**/*.py"],
+  "exclude": [
+    "**/tests/**",
+    "**/test_*.py",
+    "**/*_test.py",
+    "**/generated_tests/**",
+    "**/node_modules/**",
+    "**/__pycache__/**",
+    "**/venv/**",
+    "**/.venv/**",
+    "**/migrations/**",
+    "**/setup.py",
+    "**/conftest.py"
+  ],
+  "testFramework": "pytest",
+  "outputDir": "generated_tests",
+  "model": "gemini-2.5-flash",
+  "baseUrl": "https://generativelanguage.googleapis.com/v1beta/openai",
+  "maxTestsPerFunction": 15,
+  "skipPrivate": true,
+  "skipDunder": true,
+  "rateLimitDelay": 2,
+  "maxRetries": 2,
+  "validateBeforeSave": true,
+  "style": {
+    "useFixtures": true,
+    "useParametrize": true,
+    "docstrings": true,
+    "namingConvention": "test_<what>"
+  }
+}

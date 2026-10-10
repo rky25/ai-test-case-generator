@@ -1,0 +1,32 @@
+# Node
+node_modules/
+out/
+dist/
+
+# VS Code Extension
+*.vsix
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+.eggs/
+build/
+
+# Test artifacts
+generated_tests/
+.coverage
+.coverage.*
+htmlcov/
+coverage.json
+.pytest_cache/
+
+# Environment
+.env
+.env.local
+*.env
+
+# OS
+.DS_Store
+Thumbs.db

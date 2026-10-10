@@ -1,0 +1,46 @@
+# Source / Build
+.vscode/**
+.vscode-test/**
+src/**
+!out/**
+node_modules/**
+*.ts
+!*.d.ts
+tsconfig.json
+.gitignore
+**/*.map
+
+# Python dev artifacts
+__pycache__/**
+engine/__pycache__/**
+.coverage
+.coverage.*
+htmlcov/**
+.pytest_cache/**
+coverage.json
+*.pyc
+*.pyo
+
+# Tests / Examples dev artifacts
+tests/**
+examples/__pycache__/**
+examples/generated_tests/**
+generated_tests/**
+requirements-dev.txt
+pytest.ini
+
+# Internal docs & demo app
+AGENTS.md
+GEMINI.md
+CONVERSATION_HISTORY.md
+demo_app/**
+
+# Misc
+*.vsix
+.env
+.env.local
+.agents/**
+.git/**
+.github/**
+.DS_Store
+Thumbs.db
