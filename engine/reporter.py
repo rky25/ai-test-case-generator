@@ -45,17 +45,28 @@ def run_test_and_report(
     if not python_path or python_path == "python":
         python_path = sys.executable or "python"
 
-    # Ensure parent folder is in cwd or sys.path so imports work
+    # Multi-level ancestor path resolution so project-level imports (like from config import ...) work
     test_dir = test_path.parent
+    candidate_paths = [str(test_dir)]
+    curr = test_dir
     project_root = test_dir.parent if test_dir.name in ("generated_tests", "tests") else test_dir
+
+    for _ in range(5):
+        if curr and curr.parent != curr:
+            curr = curr.parent
+            candidate_paths.append(str(curr))
+            if any((curr / marker).exists() for marker in (".git", ".vscode", "pyproject.toml", "requirements.txt", "setup.py", "config.py")):
+                project_root = curr
+                break
 
     env = os.environ.copy()
     env["PYTHONDONTWRITEBYTECODE"] = "1"
     existing_pythonpath = env.get("PYTHONPATH", "")
+    pythonpath_additions = os.pathsep.join(candidate_paths)
     env["PYTHONPATH"] = (
-        f"{str(project_root)}{os.pathsep}{existing_pythonpath}"
+        f"{pythonpath_additions}{os.pathsep}{existing_pythonpath}"
         if existing_pythonpath
-        else str(project_root)
+        else pythonpath_additions
     )
 
     cmd = [
@@ -209,6 +220,38 @@ def _parse_pytest_detailed_output(
                 skipped_count = int(s.group(1)) if s else 0
                 total_count = passed_count + failed_count + error_count + skipped_count
                 break
+
+    # If no individual tests were found but there were errors (e.g. collection/import error), create an error card
+    if len(tests) == 0 and (error_count > 0 or failed_count > 0 or exit_code != 0):
+        err_msg = "Error during test collection / import"
+        err_type = "ImportError"
+        location = test_path.name
+
+        for line in lines:
+            if "ModuleNotFoundError:" in line or "ImportError:" in line or "SyntaxError:" in line:
+                err_msg = line.strip().replace("E   ", "")
+                if ":" in err_msg:
+                    err_type = err_msg.split(":")[0].strip()
+            elif line.startswith("E   "):
+                err_msg = line[4:].strip()
+            if ".py:" in line and ("in <module>" in line or "in test_" in line):
+                location = line.strip()
+
+        tests.append({
+            "id": f"{test_path.name}::CollectionError",
+            "name": f"Collection / Import Error: {err_type}",
+            "class_name": None,
+            "status": "ERROR",
+            "error_type": err_type,
+            "error_message": err_msg,
+            "mismatch": {
+                "description": err_msg,
+                "expected": "Module imports resolve cleanly",
+                "actual": err_msg,
+            },
+            "traceback": raw_output[:1200],
+            "location": location,
+        })
 
     pass_rate = round((passed_count / total_count * 100), 1) if total_count > 0 else 0.0
 
